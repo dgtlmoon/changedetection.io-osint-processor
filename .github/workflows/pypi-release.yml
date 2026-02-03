@@ -1,4 +1,4 @@
-name: Publish Python 🐍distribution 📦 to PyPI and TestPyPI
+name: Build, Test, and Publish Python 📦
 
 on: push
 jobs:
@@ -127,12 +127,34 @@ print(f'Summary: {wheel.summary}')
         echo "✓ All package integrity checks passed!"
 
 
+  validate-semver:
+    name: Validate semantic version
+    if: startsWith(github.ref, 'refs/tags/')  # only validate semver on tag pushes
+    needs:
+    - test-pypi-package
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Extract version from tag
+      id: get_version
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/}
+        # Strip 'v' prefix if present (handles both v0.0.1 and 0.0.1)
+        VERSION=${VERSION#v}
+        echo "Validating version: $VERSION"
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+    - name: Validate semantic version
+      uses: matt-usurp/validate-semver@v2
+      with:
+        version: ${{ steps.get_version.outputs.version }}
+
   publish-to-pypi:
     name: >-
       Publish Python 🐍 distribution 📦 to PyPI
     if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
     needs:
-    - test-pypi-package
+    - validate-semver
     runs-on: ubuntu-latest
     environment:
       name: release
