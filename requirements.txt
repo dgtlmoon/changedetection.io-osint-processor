@@ -1,0 +1,15 @@
+# OSINT Reconnaissance Processor Requirements
+# Install with: pip install -r requirements.txt
+
+changedetection.io>=0.53.1
+dnspython>=2.0.0
+python-whois>=0.8.0
+sslyze>=6.0.0
+requests>=2.26.0
+mac-vendor-lookup>=0.1.12
+
+# IMPORTANT: Cryptography version constraint
+# sslyze requires cryptography<45, but changedetection.io 0.52.4 ships with cryptography==46.0.3
+# This will downgrade cryptography to 44.x which is compatible with both packages.
+# If you experience any issues, this is likely the cause.
+cryptography>=43,<45
