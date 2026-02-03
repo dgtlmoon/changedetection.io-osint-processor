@@ -43,6 +43,21 @@ that has not been seen before (ignores text moving around like IP addresses in a
 
 ## 📦 Installation
 
+This processor agent is only used with changedetection.io
+
+### `docker-compose.yml` based installations.
+
+Uncomment and/or add this package to the `EXTRA_PACKAGES` var in `docker-compose.yml` of your changedetection.io installation.
+
+```
+  environment:                                                                                                                                                                                                      
+    - EXTRA_PACKAGES=changedetection.io-osint        
+```
+
+`EXTRA_PACKAGES` is a space-separated list of extra packages to add at startup time to changedetection.io.
+
+### Standalone pip3 installations.
+
 ```bash
 pip3 install changedetection.io-osint
 ```
