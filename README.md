@@ -10,21 +10,32 @@ Use the existing text filters built into [changedetection.io](https://github.com
 
 **Network Intelligence**
 - DNS Records (A, AAAA, MX, NS, TXT, SOA, CAA)
+- DNSSEC Validation (cryptographic signatures, chain of trust)
 - WHOIS Lookup (registration, nameservers, expiry)
 - BGP/ASN Info (ISP, network ownership)
 - Traceroute (network path analysis)
 - MAC Address (vendor identification via IEEE OUI)
+
+**Email Security**
+- SPF Records (Sender Policy Framework anti-spoofing)
+- DMARC Records (email authentication policy)
+- DKIM Records (email signature verification)
+- Email security posture assessment
 
 **Security Analysis**
 - SSL/TLS Certificates (subject, issuer, validity, SANs)
 - Cipher Suites (SSL 2.0 → TLS 1.3)
 - Vulnerability Scanning (Heartbleed, ROBOT, CCS Injection, CRIME, etc.)
 - HTTP Security Headers (HSTS)
+- SSH Fingerprinting (banner, version, host keys, algorithms)
+- SMTP Security (encryption, authentication methods)
 
 **Application Layer**
 - HTTP Fingerprinting (headers, cookies, redirects, CDN/WAF detection)
 - Port Scanning (common service ports)
 - OS Detection (TTL-based fingerprinting)
+- SSH Server Analysis (port 22)
+- SMTP Server Analysis (ports 25, 587, 465)
 
 **Performance**
 - Parallel Mode (4-5x faster scans)

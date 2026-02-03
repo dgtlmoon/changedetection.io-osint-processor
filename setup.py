@@ -11,8 +11,8 @@ from setuptools import setup, find_packages
 
 setup(
     name='changedetection-osint-processor',
-    version='0.0.1',
-    description='OSINT Reconnaissance Processor for changedetection.io',
+    version='0.0.2',
+    description='OSINT Reconnaissance Processor for changedetection.io with Email Security, DNSSEC, SSH & SMTP',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
     author='changedetection.io contributors',
@@ -47,6 +47,6 @@ setup(
         'Programming Language :: Python :: 3.11',
         'Programming Language :: Python :: 3.12',
     ],
-    keywords='osint reconnaissance dns whois ssl tls port-scan changedetection monitoring',
+    keywords='osint reconnaissance dns dnssec spf dmarc dkim whois ssl tls ssh smtp port-scan changedetection monitoring email-security',
     license='AGPL-3.0',
 )

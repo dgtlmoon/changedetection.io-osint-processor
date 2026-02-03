@@ -86,6 +86,26 @@ class processor_settings_form(processor_text_json_diff_form):
         default=True
     )
 
+    processor_config_enable_email_security = BooleanField(
+        _l('Email Security (SPF/DMARC/DKIM)'),
+        default=True
+    )
+
+    processor_config_enable_dnssec = BooleanField(
+        _l('DNSSEC Validation'),
+        default=True
+    )
+
+    processor_config_enable_ssh = BooleanField(
+        _l('SSH Fingerprinting'),
+        default=True
+    )
+
+    processor_config_enable_smtp = BooleanField(
+        _l('SMTP/Email Server Fingerprinting'),
+        default=True
+    )
+
     processor_config_whois_expire_warning_days = IntegerField(
         _l('WHOIS Expiration Warning (days)'),
         validators=[
@@ -218,6 +238,34 @@ class processor_settings_form(processor_text_json_diff_form):
                 {{ render_checkbox_field(form.processor_config_enable_os_detection) }}
                 <span class="pure-form-message-inline">
                     OS detection via TTL fingerprinting (requires raw socket permissions for active scanning)
+                </span>
+            </div>
+
+            <div class="pure-control-group">
+                {{ render_checkbox_field(form.processor_config_enable_email_security) }}
+                <span class="pure-form-message-inline">
+                    Email security: SPF, DMARC, and DKIM record analysis for anti-spoofing
+                </span>
+            </div>
+
+            <div class="pure-control-group">
+                {{ render_checkbox_field(form.processor_config_enable_dnssec) }}
+                <span class="pure-form-message-inline">
+                    DNSSEC validation: Verify DNS cryptographic signatures and chain of trust
+                </span>
+            </div>
+
+            <div class="pure-control-group">
+                {{ render_checkbox_field(form.processor_config_enable_ssh) }}
+                <span class="pure-form-message-inline">
+                    SSH fingerprinting: Server banner, version, host keys, and supported algorithms
+                </span>
+            </div>
+
+            <div class="pure-control-group">
+                {{ render_checkbox_field(form.processor_config_enable_smtp) }}
+                <span class="pure-form-message-inline">
+                    SMTP fingerprinting: Email server capabilities, authentication, and encryption (ports 25, 587, 465)
                 </span>
             </div>
         </fieldset>

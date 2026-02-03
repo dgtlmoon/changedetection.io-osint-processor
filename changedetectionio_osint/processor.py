@@ -32,6 +32,10 @@ from .steps import traceroute
 from .steps import bgp as bgp_step
 from .steps import mac_lookup
 from .steps import os_detection
+from .steps import email_security
+from .steps import dnssec
+from .steps import ssh_fingerprint
+from .steps import smtp_fingerprint
 
 # ============================================================================
 # CONFIGURATION
@@ -53,7 +57,7 @@ from changedetectionio.processors.text_json_diff.processor import perform_site_c
 # Translation marker for extraction
 def _(x): return x
 name = _('OSINT Reconnaissance')
-description = _('Comprehensive reconnaissance: DNS, WHOIS, HTTP, TLS, Ports, Traceroute, BGP')
+description = _('Comprehensive reconnaissance: DNS, DNSSEC, SPF/DMARC/DKIM, WHOIS, HTTP, TLS, SSH, SMTP, Ports, Traceroute, BGP')
 del _
 processor_weight = -50
 list_badge_text = "OSINT"
@@ -65,9 +69,13 @@ class perform_site_check(text_json_diff_processor):
 
     Reconnaissance steps (configurable MODE: serial or parallel):
     - DNS queries (A, AAAA, MX, NS, TXT, SOA, CAA)
+    - DNSSEC validation (cryptographic signatures, chain of trust)
+    - Email security (SPF, DMARC, DKIM records)
     - WHOIS lookups
     - HTTP response fingerprinting (CDN/WAF detection, redirect chains)
     - SSL/TLS certificate analysis
+    - SSH fingerprinting (banner, version, host keys, algorithms)
+    - SMTP fingerprinting (encryption, authentication, capabilities)
     - Port scanning
     - Traceroute (last N hops)
     - BGP/ASN information
@@ -110,6 +118,10 @@ class perform_site_check(text_json_diff_processor):
         enable_traceroute = processor_config.get('enable_traceroute', True)
         enable_bgp = processor_config.get('enable_bgp', True)
         enable_os_detection = processor_config.get('enable_os_detection', True)
+        enable_email_security = processor_config.get('enable_email_security', True)
+        enable_dnssec = processor_config.get('enable_dnssec', True)
+        enable_ssh = processor_config.get('enable_ssh', True)
+        enable_smtp = processor_config.get('enable_smtp', True)
         whois_expire_warning_days = processor_config.get('whois_expire_warning_days', 3)
         tls_expire_warning_days = processor_config.get('tls_expire_warning_days', 3)
 
@@ -200,6 +212,14 @@ class perform_site_check(text_json_diff_processor):
                     scans.append(bgp_step.scan_bgp(ip_address, watch_uuid, update_signal))
                 if enable_os_detection:
                     scans.append(os_detection.scan_os(ip_address, watch_uuid, update_signal))
+                if enable_email_security:
+                    scans.append(email_security.scan_email_security(hostname, dns_resolver, watch_uuid, update_signal))
+                if enable_dnssec:
+                    scans.append(dnssec.scan_dnssec(hostname, dns_resolver, watch_uuid, update_signal))
+                if enable_ssh:
+                    scans.append(ssh_fingerprint.scan_ssh(hostname, 22, 5, watch_uuid, update_signal))
+                if enable_smtp:
+                    scans.append(smtp_fingerprint.scan_smtp(hostname, [25, 587, 465], 5, watch_uuid, update_signal))
 
                 # MAC address lookup (always enabled for local network detection)
                 scans.append(mac_lookup.scan_mac(ip_address, watch_uuid, update_signal))
@@ -226,11 +246,20 @@ class perform_site_check(text_json_diff_processor):
                     idx += 1 if enable_bgp else 0
                     os_data = results[idx] if enable_os_detection else None
                     idx += 1 if enable_os_detection else 0
+                    email_security_data = results[idx] if enable_email_security else None
+                    idx += 1 if enable_email_security else 0
+                    dnssec_data = results[idx] if enable_dnssec else None
+                    idx += 1 if enable_dnssec else 0
+                    ssh_data = results[idx] if enable_ssh else None
+                    idx += 1 if enable_ssh else 0
+                    smtp_data = results[idx] if enable_smtp else None
+                    idx += 1 if enable_smtp else 0
                     mac_data = results[idx]  # Always runs
                 else:
                     # No scans enabled
                     dns_results = whois_data = http_fingerprint_data = tls_results = None
                     open_ports = traceroute_hops = bgp_data = os_data = mac_data = None
+                    email_security_data = dnssec_data = ssh_data = smtp_data = None
 
             else:  # scan_mode == "serial"
                 logger.info("Starting SERIAL reconnaissance scans...")
@@ -254,6 +283,14 @@ class perform_site_check(text_json_diff_processor):
                 bgp_data = await bgp_step.scan_bgp(ip_address, watch_uuid, update_signal) if enable_bgp else None
 
                 os_data = await os_detection.scan_os(ip_address, watch_uuid, update_signal) if enable_os_detection else None
+
+                email_security_data = await email_security.scan_email_security(hostname, dns_resolver, watch_uuid, update_signal) if enable_email_security else None
+
+                dnssec_data = await dnssec.scan_dnssec(hostname, dns_resolver, watch_uuid, update_signal) if enable_dnssec else None
+
+                ssh_data = await ssh_fingerprint.scan_ssh(hostname, 22, 5, watch_uuid, update_signal) if enable_ssh else None
+
+                smtp_data = await smtp_fingerprint.scan_smtp(hostname, [25, 587, 465], 5, watch_uuid, update_signal) if enable_smtp else None
 
                 # MAC address lookup (always enabled for local network detection)
                 mac_data = await mac_lookup.scan_mac(ip_address, watch_uuid, update_signal)
@@ -290,6 +327,14 @@ class perform_site_check(text_json_diff_processor):
             if dns_results and not isinstance(dns_results, Exception):
                 sections["DNS Records"] = dns_step.format_dns_results(dns_results)
 
+            # DNSSEC section
+            if dnssec_data and not isinstance(dnssec_data, Exception):
+                sections["DNSSEC Validation"] = dnssec.format_dnssec_results(dnssec_data)
+
+            # Email Security section
+            if email_security_data and not isinstance(email_security_data, Exception):
+                sections["Email Security (SPF/DMARC/DKIM)"] = email_security.format_email_security_results(email_security_data)
+
             # WHOIS section
             if whois_data and not isinstance(whois_data, Exception):
                 sections["WHOIS Information"] = whois_lookup.format_whois_results(whois_data, whois_expire_warning_days)
@@ -301,6 +346,14 @@ class perform_site_check(text_json_diff_processor):
             # TLS/SSL section (only for HTTPS)
             if parsed.scheme == 'https' and tls_results and not isinstance(tls_results, Exception) and tls_results:
                 sections["SSL/TLS Analysis (SSLyze)"] = tls_analysis.format_tls_results(tls_results, tls_expire_warning_days, watch_uuid, update_signal)
+
+            # SSH fingerprint section
+            if ssh_data and not isinstance(ssh_data, Exception):
+                sections["SSH Server Fingerprint"] = ssh_fingerprint.format_ssh_results(ssh_data, 22)
+
+            # SMTP fingerprint section
+            if smtp_data and not isinstance(smtp_data, Exception):
+                sections["SMTP/Email Server Fingerprint"] = smtp_fingerprint.format_smtp_results(smtp_data)
 
             # Traceroute section
             if traceroute_hops and not isinstance(traceroute_hops, Exception):
