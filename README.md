@@ -51,7 +51,7 @@ Uncomment and/or add this package to the `EXTRA_PACKAGES` var in `docker-compose
 
 ```
   environment:                                                                                                                                                                                                      
-    - EXTRA_PACKAGES=changedetection.io-osint        
+    - EXTRA_PACKAGES=changedetection.io-osint-processor
 ```
 
 `EXTRA_PACKAGES` is a space-separated list of extra packages to add at startup time to changedetection.io.
