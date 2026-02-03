@@ -4,6 +4,7 @@ Performs WHOIS queries using python-whois library
 """
 
 import asyncio
+from datetime import datetime, timezone
 from loguru import logger
 
 
@@ -30,8 +31,13 @@ async def scan_whois(hostname, watch_uuid=None, update_signal=None):
         return None
 
 
-def format_whois_results(whois_data):
-    """Format WHOIS results for output"""
+def format_whois_results(whois_data, expire_warning_days=3):
+    """Format WHOIS results for output
+
+    Args:
+        whois_data: WHOIS data object
+        expire_warning_days: Number of days before expiration to show warning (default: 3)
+    """
     lines = []
     lines.append("=== WHOIS Information ===")
 
@@ -50,6 +56,7 @@ def format_whois_results(whois_data):
             'country': 'Country',
         }
 
+        expiration_date = None
         for key, label in field_map.items():
             value = getattr(whois_data, key, None)
             if value:
@@ -59,12 +66,44 @@ def format_whois_results(whois_data):
                         value = value[0] if value else None
                         if value:
                             lines.append(f"{label}: {value}")
+                            # Track expiration date for countdown calculation
+                            if key == 'expiration_date':
+                                expiration_date = value
                     else:
                         lines.append(f"{label}:")
                         for item in value[:10]:  # Limit to 10 items
                             lines.append(f"  - {item}")
                 else:
                     lines.append(f"{label}: {value}")
+                    # Track expiration date for countdown calculation
+                    if key == 'expiration_date':
+                        expiration_date = value
+
+        # Add expiration countdown if within configured warning days
+        if expiration_date and expire_warning_days > 0:
+            try:
+                # Ensure expiration_date is a datetime object
+                if not isinstance(expiration_date, datetime):
+                    expiration_date = datetime.fromisoformat(str(expiration_date).replace('Z', '+00:00'))
+
+                # Make timezone-aware if needed
+                if expiration_date.tzinfo is None:
+                    expiration_date = expiration_date.replace(tzinfo=timezone.utc)
+
+                now = datetime.now(timezone.utc)
+                days_to_expire = (expiration_date - now).days
+
+                if days_to_expire <= expire_warning_days and days_to_expire >= 0:
+                    if days_to_expire == 0:
+                        lines.append("⚠️  WARNING: Domain expires TODAY!")
+                    elif days_to_expire == 1:
+                        lines.append("⚠️  WARNING: Domain expires in 1 day")
+                    else:
+                        lines.append(f"⚠️  WARNING: Domain expires in {days_to_expire} days")
+                elif days_to_expire < 0:
+                    lines.append("⚠️  WARNING: Domain has EXPIRED!")
+            except Exception as e:
+                logger.debug(f"Could not calculate expiration countdown: {e}")
     else:
         lines.append("No WHOIS data available")
 

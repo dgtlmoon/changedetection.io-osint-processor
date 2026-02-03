@@ -7,6 +7,7 @@ a JSON file in the watch data directory (osint_recon.json).
 
 from wtforms import (
     BooleanField,
+    IntegerField,
     StringField,
     validators
 )
@@ -85,6 +86,15 @@ class processor_settings_form(processor_text_json_diff_form):
         default=True
     )
 
+    processor_config_whois_expire_warning_days = IntegerField(
+        _l('WHOIS Expiration Warning (days)'),
+        validators=[
+            validators.Optional(),
+            validators.NumberRange(min=0, max=365, message=_l('Must be between 0 and 365 days'))
+        ],
+        default=3
+    )
+
     def extra_tab_content(self):
         """Tab label for processor-specific settings."""
         return _l('OSINT Settings')
@@ -136,6 +146,13 @@ class processor_settings_form(processor_text_json_diff_form):
                 {{ render_checkbox_field(form.processor_config_enable_whois) }}
                 <span class="pure-form-message-inline">
                     WHOIS domain registration information (registrar, nameservers, dates)
+                </span>
+            </div>
+
+            <div class="pure-control-group" style="margin-left: 25px;">
+                {{ render_field(form.processor_config_whois_expire_warning_days, placeholder="3", size="5") }}
+                <span class="pure-form-message-inline">
+                    Show countdown warning when domain expires within this many days (0 to disable warnings)
                 </span>
             </div>
 

@@ -110,6 +110,7 @@ class perform_site_check(text_json_diff_processor):
         enable_traceroute = processor_config.get('enable_traceroute', True)
         enable_bgp = processor_config.get('enable_bgp', True)
         enable_os_detection = processor_config.get('enable_os_detection', True)
+        whois_expire_warning_days = processor_config.get('whois_expire_warning_days', 3)
 
         logger.info(f"Running OSINT reconnaissance on {url} (mode: {scan_mode}, DNS: {dns_server})")
         update_signal.send(watch_uuid=watch_uuid, status="Starting")
@@ -290,7 +291,7 @@ class perform_site_check(text_json_diff_processor):
 
             # WHOIS section
             if whois_data and not isinstance(whois_data, Exception):
-                sections["WHOIS Information"] = whois_lookup.format_whois_results(whois_data)
+                sections["WHOIS Information"] = whois_lookup.format_whois_results(whois_data, whois_expire_warning_days)
 
             # HTTP fingerprint section
             if http_fingerprint_data and not isinstance(http_fingerprint_data, Exception):
