@@ -32,18 +32,27 @@ Use the existing text filters built into [changedetection.io](https://github.com
 - Configurable modules (enable/disable any scan)
 - Real-time status updates
 
+_Example settings_
+
+<img src="docs/osint-changedetection-settings.png" style="max-width: 500px;" alt="OSINT changedetection.io settings page example" title="OSINT changedetection.io settings page example">
+
+#### Pro-tips:
+- Use the _"Only trigger when unique lines appear in all history"_ text filter setting to limit to new events 
+that has not been seen before (ignores text moving around like IP addresses in a pool).
+
+
 ## 📦 Installation
 
 ```bash
-cd /path/to/changedetection.io
-pip install -e ./changedetectionio_osint/
+pip3 install changedetection.io-osint
 ```
-
-**Requirements:** `dnspython`, `python-whois`, `sslyze`, `requests`, `mac-vendor-lookup`
 
 **⚠️ Note:** Requires `cryptography>=43,<45` for sslyze compatibility.
 
+**⚠️ Note note!:** Does not actually use any proxy settings for now (runs from your changedetection.io network source).
+
 ## 🚀 Quick Start
+<img src="docs/osint-use.png" style="max-width: 500px;">
 
 1. Create a watch with URL: `https://example.com`
 2. Select processor: **OSINT Reconnaissance**
@@ -53,6 +62,9 @@ pip install -e ./changedetectionio_osint/
    - Enable/Disable modules as needed
 
 ## 📊 Sample Output
+
+
+<img src="docs/osint-example-difference.png" style="max-width: 500px;" alt="Difference detected to IP address, routers, DNS etc"  title="Difference detected to IP address, routers, DNS etc">
 
 ```
 Target: https://example.com
@@ -131,10 +143,6 @@ Status: ✓ All checks passed
 
 **Slow Scans:** Use Parallel mode, disable Port Scanning or Vulnerability Scanning
 
-## 🤝 Contributing
-
-Contributions welcome! Submit issues or PRs at the [changedetection.io repository](https://github.com/dgtlmoon/changedetection.io).
-
 ## 📄 License
 
 GNU Affero General Public License v3.0 (AGPL-3.0)
@@ -148,8 +156,6 @@ Built with: [changedetection.io](https://github.com/dgtlmoon/changedetection.io)
 ---
 
 <div align="center">
-
-**[Report Bug](https://github.com/dgtlmoon/changedetection.io/issues)** • **[Request Feature](https://github.com/dgtlmoon/changedetection.io/issues)**
 
 Made with ❤️ for the OSINT community
 
