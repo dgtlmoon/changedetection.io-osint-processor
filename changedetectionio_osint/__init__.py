@@ -12,3 +12,10 @@ description = _('Comprehensive reconnaissance using OSINT tools (DNS, WHOIS, SSL
 processor_weight = -50  # Show before text_json_diff
 list_badge_text = "OSINT"
 del _
+
+# Processor capabilities (defaults to False unless specified)
+supports_visual_selector = False
+supports_browser_steps = False
+supports_text_filters_and_triggers = True
+supports_request_type = False
+
