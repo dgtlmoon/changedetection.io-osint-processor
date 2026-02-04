@@ -70,7 +70,7 @@ Uncomment and/or add this package to the `EXTRA_PACKAGES` var in `docker-compose
 ### Standalone pip3 installations.
 
 ```bash
-pip3 install changedetection.io-osint
+pip3 install changedetection.io-osint-processor
 ```
 
 **⚠️ Note:** Requires `cryptography>=43,<45` for sslyze compatibility.
