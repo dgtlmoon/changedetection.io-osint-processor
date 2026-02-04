@@ -21,6 +21,8 @@ jobs:
         grep "version=" setup.py
 
     - uses: hynek/build-and-inspect-python-package@v2
+      with:
+        artifact-name: python-package-distributions
 
 
   validate-semver:
