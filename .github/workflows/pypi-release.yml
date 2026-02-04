@@ -52,6 +52,7 @@ jobs:
       Publish Python 🐍 distribution 📦 to PyPI
     if: startsWith(github.ref, 'refs/tags/')  # only publish to PyPI on tag pushes
     needs:
+    - build-and-inspect
     - validate-semver
     runs-on: ubuntu-latest
     environment:
