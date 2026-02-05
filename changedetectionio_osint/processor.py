@@ -169,6 +169,8 @@ class perform_site_check(text_json_diff_processor):
 
             # Resolve IP address first (needed by several steps)
             # Check if hostname is already an IP address
+            dns_resolution_failed = False
+            dns_error_message = None
             try:
                 ipaddress.ip_address(hostname)
                 # It's already an IP address, no DNS resolution needed
@@ -185,52 +187,38 @@ class perform_site_check(text_json_diff_processor):
                         answers = dns_resolver.resolve(hostname, 'AAAA')
                         ip_address = str(answers[0])
                     except Exception as dns_error:
-                        # DNS resolution failed - return error as output text instead of throwing
-                        error_output = (
-                            f"Target: {url}\n"
-                            f"Hostname: {hostname}\n"
-                            f"\n"
-                            f"⚠ ERROR: Could not resolve hostname: {hostname}\n"
-                            f"DNS Server: {dns_server}\n"
-                            f"Error details: {str(dns_error)}\n"
-                        )
+                        # DNS resolution failed - continue with checks that don't require IP
+                        dns_resolution_failed = True
+                        dns_error_message = str(dns_error)
+                        ip_address = None
+                        logger.warning(f"Could not resolve hostname {hostname}: {dns_error_message}")
+                        logger.info("Continuing with checks that don't require IP address (WHOIS, HTTP, TLS, Email Security, DNSSEC, SSH, SMTP)")
+                        update_signal.send(watch_uuid=watch_uuid, status="DNS resolution failed, continuing...")
 
-                        # Set the error content in our fetcher
-                        self.fetcher.content = error_output
+            if ip_address:
+                logger.debug(f"Resolved {hostname} to {ip_address}")
 
-                        # Set some basic headers
-                        if not hasattr(self.fetcher, 'headers') or self.fetcher.headers is None or not isinstance(self.fetcher.headers, dict):
-                            self.fetcher.headers = CaseInsensitiveDict()
-                        elif not isinstance(self.fetcher.headers, CaseInsensitiveDict):
-                            self.fetcher.headers = CaseInsensitiveDict(self.fetcher.headers)
-
-                        self.fetcher.headers['content-type'] = 'text/plain; charset=utf-8'
-
-                        # Mark as successful fetch (with error content)
-                        if not hasattr(self.fetcher, 'status_code') or self.fetcher.status_code is None:
-                            self.fetcher.status_code = 200
-
-                        logger.warning(f"Could not resolve hostname {hostname}: {str(dns_error)}")
-                        update_signal.send(watch_uuid=watch_uuid, status="DNS resolution failed")
-                        return  # Exit early with error message in content
-
-            logger.debug(f"Resolved {hostname} to {ip_address}")
-
-            # Reverse DNS lookup
-            try:
-                rev_name = dns.reversename.from_address(ip_address)
-                answers = dns_resolver.resolve(rev_name, 'PTR')
-                reverse_dns = str(answers[0])
-            except:
-                reverse_dns = "No PTR record"
+            # Reverse DNS lookup (only if we have an IP)
+            reverse_dns = "No PTR record"
+            if ip_address:
+                try:
+                    rev_name = dns.reversename.from_address(ip_address)
+                    answers = dns_resolver.resolve(rev_name, 'PTR')
+                    reverse_dns = str(answers[0])
+                except:
+                    reverse_dns = "No PTR record"
 
             # =================================================================
             # RUN SCAN STEPS (SERIAL OR PARALLEL BASED ON MODE)
             # =================================================================
 
-            # Track which steps are skipped due to SOCKS5 incompatibility
+            # Track which steps are skipped due to SOCKS5 incompatibility or DNS failure
             skipped_steps = []
             using_socks5_proxy = bool(proxy_url and proxy_url.strip())
+
+            # Add DNS resolution failure notice to skipped steps
+            if dns_resolution_failed:
+                skipped_steps.append(("DNS Resolution", f"Failed to resolve {hostname}: {dns_error_message}"))
 
             if scan_mode == "parallel":
                 logger.info("Starting PARALLEL reconnaissance scans...")
@@ -282,28 +270,36 @@ class perform_site_check(text_json_diff_processor):
 
                 # Port Scanning
                 if enable_portscan:
-                    if using_socks5_proxy and not portscan.supports_socks5:
+                    if not ip_address:
+                        skipped_steps.append(("Port Scanning", "Requires IP address (DNS resolution failed)"))
+                    elif using_socks5_proxy and not portscan.supports_socks5:
                         skipped_steps.append(("Port Scanning", "Raw socket port scanning not compatible with SOCKS5"))
                     else:
                         scans.append(portscan.scan_ports(ip_address, None, watch_uuid, update_signal))
 
                 # Traceroute
                 if enable_traceroute:
-                    if using_socks5_proxy and not traceroute.supports_socks5:
+                    if not ip_address:
+                        skipped_steps.append(("Traceroute", "Requires IP address (DNS resolution failed)"))
+                    elif using_socks5_proxy and not traceroute.supports_socks5:
                         skipped_steps.append(("Traceroute", "ICMP/UDP traceroute not compatible with SOCKS5"))
                     else:
                         scans.append(traceroute.scan_traceroute(ip_address, dns_resolver, traceroute.TRACEROUTE_LAST_HOPS, watch_uuid, update_signal))
 
                 # BGP/ASN
                 if enable_bgp:
-                    if using_socks5_proxy and not bgp_step.supports_socks5:
+                    if not ip_address:
+                        skipped_steps.append(("BGP/ASN Information", "Requires IP address (DNS resolution failed)"))
+                    elif using_socks5_proxy and not bgp_step.supports_socks5:
                         skipped_steps.append(("BGP/ASN Information", "BGP lookups not compatible with SOCKS5 proxy"))
                     else:
                         scans.append(bgp_step.scan_bgp(ip_address, watch_uuid, update_signal))
 
                 # OS Detection
                 if enable_os_detection:
-                    if using_socks5_proxy and not os_detection.supports_socks5:
+                    if not ip_address:
+                        skipped_steps.append(("OS Detection", "Requires IP address (DNS resolution failed)"))
+                    elif using_socks5_proxy and not os_detection.supports_socks5:
                         skipped_steps.append(("OS Detection", "TTL-based fingerprinting requires raw sockets, incompatible with SOCKS5"))
                     else:
                         scans.append(os_detection.scan_os(ip_address, watch_uuid, update_signal))
@@ -337,7 +333,9 @@ class perform_site_check(text_json_diff_processor):
                         scans.append(smtp_fingerprint.scan_smtp_mx_records(mx_records, dns_resolver, [25, 587, 465], 5, proxy_url, smtp_ehlo_hostname, watch_uuid, update_signal))
 
                 # MAC address lookup (always enabled for local network detection)
-                if using_socks5_proxy and not mac_lookup.supports_socks5:
+                if not ip_address:
+                    skipped_steps.append(("MAC Address Lookup", "Requires IP address (DNS resolution failed)"))
+                elif using_socks5_proxy and not mac_lookup.supports_socks5:
                     skipped_steps.append(("MAC Address Lookup", "Layer 2 local network only, not compatible with SOCKS5"))
                 else:
                     scans.append(mac_lookup.scan_mac(ip_address, watch_uuid, update_signal))
@@ -430,7 +428,10 @@ class perform_site_check(text_json_diff_processor):
 
                 # Port Scanning
                 if enable_portscan:
-                    if using_socks5_proxy and not portscan.supports_socks5:
+                    if not ip_address:
+                        skipped_steps.append(("Port Scanning", "Requires IP address (DNS resolution failed)"))
+                        open_ports = None
+                    elif using_socks5_proxy and not portscan.supports_socks5:
                         skipped_steps.append(("Port Scanning", "Raw socket port scanning not compatible with SOCKS5"))
                         open_ports = None
                     else:
@@ -440,7 +441,10 @@ class perform_site_check(text_json_diff_processor):
 
                 # Traceroute
                 if enable_traceroute:
-                    if using_socks5_proxy and not traceroute.supports_socks5:
+                    if not ip_address:
+                        skipped_steps.append(("Traceroute", "Requires IP address (DNS resolution failed)"))
+                        traceroute_hops = None
+                    elif using_socks5_proxy and not traceroute.supports_socks5:
                         skipped_steps.append(("Traceroute", "ICMP/UDP traceroute not compatible with SOCKS5"))
                         traceroute_hops = None
                     else:
@@ -450,7 +454,10 @@ class perform_site_check(text_json_diff_processor):
 
                 # BGP/ASN
                 if enable_bgp:
-                    if using_socks5_proxy and not bgp_step.supports_socks5:
+                    if not ip_address:
+                        skipped_steps.append(("BGP/ASN Information", "Requires IP address (DNS resolution failed)"))
+                        bgp_data = None
+                    elif using_socks5_proxy and not bgp_step.supports_socks5:
                         skipped_steps.append(("BGP/ASN Information", "BGP lookups not compatible with SOCKS5 proxy"))
                         bgp_data = None
                     else:
@@ -460,7 +467,10 @@ class perform_site_check(text_json_diff_processor):
 
                 # OS Detection
                 if enable_os_detection:
-                    if using_socks5_proxy and not os_detection.supports_socks5:
+                    if not ip_address:
+                        skipped_steps.append(("OS Detection", "Requires IP address (DNS resolution failed)"))
+                        os_data = None
+                    elif using_socks5_proxy and not os_detection.supports_socks5:
                         skipped_steps.append(("OS Detection", "TTL-based fingerprinting requires raw sockets, incompatible with SOCKS5"))
                         os_data = None
                     else:
@@ -509,7 +519,10 @@ class perform_site_check(text_json_diff_processor):
                     smtp_data = None
 
                 # MAC address lookup (always enabled for local network detection)
-                if using_socks5_proxy and not mac_lookup.supports_socks5:
+                if not ip_address:
+                    skipped_steps.append(("MAC Address Lookup", "Requires IP address (DNS resolution failed)"))
+                    mac_data = None
+                elif using_socks5_proxy and not mac_lookup.supports_socks5:
                     skipped_steps.append(("MAC Address Lookup", "Layer 2 local network only, not compatible with SOCKS5"))
                     mac_data = None
                 else:
@@ -525,8 +538,13 @@ class perform_site_check(text_json_diff_processor):
             header_lines = []
             header_lines.append(f"Target: {url}")
             header_lines.append(f"Hostname: {hostname}")
-            header_lines.append(f"IP Address: {ip_address}")
-            header_lines.append(f"Reverse DNS: {reverse_dns}")
+            if ip_address:
+                header_lines.append(f"IP Address: {ip_address}")
+                header_lines.append(f"Reverse DNS: {reverse_dns}")
+            else:
+                header_lines.append(f"IP Address: Unable to resolve (DNS lookup failed)")
+                if dns_error_message:
+                    header_lines.append(f"DNS Error: {dns_error_message}")
 
             # Show proxy if configured
             if proxy_url and proxy_url.strip():
@@ -538,10 +556,13 @@ class perform_site_check(text_json_diff_processor):
                 if mac_data.get('vendor'):
                     header_lines.append(f"MAC Vendor: {mac_data['vendor']}")
 
-            # Show skipped steps if using SOCKS5 proxy
+            # Show skipped steps if using SOCKS5 proxy or DNS resolution failed
             if skipped_steps:
                 header_lines.append("")
-                header_lines.append("⚠ STEPS SKIPPED DUE TO SOCKS5 PROXY:")
+                if dns_resolution_failed:
+                    header_lines.append("⚠ SOME STEPS SKIPPED:")
+                else:
+                    header_lines.append("⚠ STEPS SKIPPED DUE TO SOCKS5 PROXY:")
                 for step_name, reason in skipped_steps:
                     header_lines.append(f"  ✗ {step_name} - {reason}")
 
