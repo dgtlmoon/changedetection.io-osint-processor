@@ -71,7 +71,7 @@ This processor agent is only used with changedetection.io
 
 ### `docker-compose.yml` based installations.
 
-Uncomment and/or add this package to the `EXTRA_PACKAGES` var in `docker-compose.yml` of your changedetection.io installation.
+Uncomment and/or add this package to the `EXTRA_PACKAGES` var in `docker-compose.yml` of your [**changedetection.io**](https://github.com/dgtlmoon/changedetection.io) dashboard installation.
 
 ```
   environment:                                                                                                                                                                                                      
